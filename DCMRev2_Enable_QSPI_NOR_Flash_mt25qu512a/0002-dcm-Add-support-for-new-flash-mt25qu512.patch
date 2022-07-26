@@ -1,0 +1,66 @@
+From 593af12ab718c47bd7cd53c711a7464dcbd2ecaa Mon Sep 17 00:00:00 2001
+From: Ashish Kumar <Ashish.Kumar@nxp.com>
+Date: Wed, 23 Jan 2019 17:00:48 +0530
+Subject: [PATCH] dcm: Add support for new flash mt25qu512
+
+Signed-off-by: Ashish Kumar <Ashish.Kumar@nxp.com>
+---
+ arch/arm/dts/fsl-ls1043a-dcm.dts | 9 ++++++++-
+ drivers/mtd/spi/spi_flash_ids.c  | 1 +
+ include/configs/ls1043adcm.h     | 2 +-
+ 3 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/dts/fsl-ls1043a-dcm.dts b/arch/arm/dts/fsl-ls1043a-dcm.dts
+index 481713a4a9..6160abd976 100644
+--- a/arch/arm/dts/fsl-ls1043a-dcm.dts
++++ b/arch/arm/dts/fsl-ls1043a-dcm.dts
+@@ -28,13 +28,20 @@
+        bus-num = <0>;
+        status = "okay";
+ 
+-       qflash0: s25fl128s@0 {
++       qflash0: mt25qu512@0 {
+                #address-cells = <1>;
+                #size-cells = <1>;
+                compatible = "spi-flash";
+                spi-max-frequency = <20000000>;
+                reg = <0>;
+        };
++       qflash1: mt25qu512@0 {
++               #address-cells = <1>;
++               #size-cells = <1>;
++               compatible = "spi-flash";
++               spi-max-frequency = <20000000>;
++               reg = <1>;
++       };
+ };
+ 
+ &i2c0 {
+diff --git a/drivers/mtd/spi/spi_flash_ids.c b/drivers/mtd/spi/spi_flash_ids.c
+index 2a678ce190..072e68ada2 100644
+--- a/drivers/mtd/spi/spi_flash_ids.c
++++ b/drivers/mtd/spi/spi_flash_ids.c
+@@ -129,6 +129,7 @@ const struct spi_flash_info spi_flash_ids[] = {
+ 	{"n25q256a",	   INFO(0x20bb19, 0x0,  64 * 1024,   512, RD_FULL | WR_QPP | SECT_4K) },
+ 	{"n25q512",	   INFO(0x20ba20, 0x0,  64 * 1024,  1024, RD_FULL | WR_QPP | E_FSR | SECT_4K) },
+ 	{"mt25tl01g",      INFO6(0x20bb20, 0x104402,  64 * 1024,  2048, RD_FULL | WR_QPP | ADDR_4B) },
++	{"mt25qu512a",     INFO6(0x20bb20, 0x104400, 64 * 1024, 1024, RD_FULL | WR_QPP | ADDR_4B) },
+ 	{"n25q512a",	   INFO(0x20bb20, 0x0,  64 * 1024,  1024, RD_FULL | WR_QPP | E_FSR | SECT_4K) },
+ 	{"n25q1024",	   INFO(0x20ba21, 0x0,  64 * 1024,  2048, RD_FULL | WR_QPP | E_FSR | SECT_4K) },
+ 	{"n25q1024a",	   INFO(0x20bb21, 0x0,  64 * 1024,  2048, RD_FULL | WR_QPP | E_FSR | SECT_4K) },
+diff --git a/include/configs/ls1043adcm.h b/include/configs/ls1043adcm.h
+index 86c9858b48..4dc530fa8e 100644
+--- a/include/configs/ls1043adcm.h
++++ b/include/configs/ls1043adcm.h
+@@ -58,7 +58,7 @@
+ /* QSPI */
+ #ifndef SPL_NO_QSPI
+ #ifdef CONFIG_FSL_QSPI
+-#define FSL_QSPI_FLASH_SIZE             SZ_128M
++#define FSL_QSPI_FLASH_SIZE             SZ_64M
+ #define FSL_QSPI_FLASH_NUM              2
+ #endif
+ #endif
+-- 
+2.17.1
+

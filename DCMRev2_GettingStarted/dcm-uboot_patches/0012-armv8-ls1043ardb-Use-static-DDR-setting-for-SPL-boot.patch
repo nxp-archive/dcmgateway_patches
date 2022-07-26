@@ -1,0 +1,186 @@
+From c625f31716a318627ee1e2570bf831b889739085 Mon Sep 17 00:00:00 2001
+From: York Sun <york.sun@nxp.com>
+Date: Thu, 28 Sep 2017 08:42:13 -0700
+Subject: [PATCH 12/13] armv8: ls1043ardb: Use static DDR setting for SPL boot
+
+This board has soldered DDR chips. To reduce the SPL image size,
+use static DDR setting instead of dynamic DDR driver.
+
+Signed-off-by: York Sun <york.sun@nxp.com>
+---
+ board/freescale/ls1043ardb/ddr.c | 46 +++++++++++++++++++++++++++
+ board/freescale/ls1043ardb/ddr.h | 69 ++++++++++++++++++++++++++++++++++++++++
+ include/configs/ls1043ardb.h     |  6 ++--
+ 3 files changed, 118 insertions(+), 3 deletions(-)
+
+diff --git a/board/freescale/ls1043ardb/ddr.c b/board/freescale/ls1043ardb/ddr.c
+index 354b864..fc0c1f6 100644
+--- a/board/freescale/ls1043ardb/ddr.c
++++ b/board/freescale/ls1043ardb/ddr.c
+@@ -169,18 +169,64 @@ int fsl_ddr_get_dimm_params(dimm_params_t *pdimm,
+ 
+ 	return 0;
+ }
++#else
++
++phys_size_t fixed_sdram(void)
++{
++	int i;
++	char buf[32];
++	fsl_ddr_cfg_regs_t ddr_cfg_regs;
++	phys_size_t ddr_size;
++	ulong ddr_freq, ddr_freq_mhz;
++
++	ddr_freq = get_ddr_freq(0);
++	ddr_freq_mhz = ddr_freq / 1000000;
++
++	printf("Configuring DDR for %s MT/s data rate\n",
++	       strmhz(buf, ddr_freq));
++
++	for (i = 0; fixed_ddr_parm_0[i].max_freq > 0; i++) {
++		if ((ddr_freq_mhz > fixed_ddr_parm_0[i].min_freq) &&
++		    (ddr_freq_mhz <= fixed_ddr_parm_0[i].max_freq)) {
++			memcpy(&ddr_cfg_regs,
++			       fixed_ddr_parm_0[i].ddr_settings,
++			       sizeof(ddr_cfg_regs));
++			break;
++		}
++	}
++
++	if (fixed_ddr_parm_0[i].max_freq == 0)
++		panic("Unsupported DDR data rate %s MT/s data rate\n",
++		      strmhz(buf, ddr_freq));
++
++	ddr_size = (phys_size_t)2048 * 1024 * 1024;
++	fsl_ddr_set_memctl_regs(&ddr_cfg_regs, 0, 0);
++
++	return ddr_size;
++}
+ #endif
+ 
+ int fsl_initdram(void)
+ {
+ 	phys_size_t dram_size;
+ 
++#ifdef CONFIG_SYS_DDR_RAW_TIMING
+ #if defined(CONFIG_SPL_BUILD) || !defined(CONFIG_SPL)
+ 	puts("Initializing DDR....\n");
+ 	dram_size = fsl_ddr_sdram();
+ #else
+ 	dram_size =  fsl_ddr_sdram_size();
+ #endif
++#else
++#if defined(CONFIG_SPL_BUILD) || !defined(CONFIG_SPL)
++	puts("Initialzing DDR using fixed setting\n");
++	dram_size = fixed_sdram();
++#else
++	gd->ram_size = 0x80000000;
++
++	return 0;
++#endif
++#endif
+ 	erratum_a008850_post();
+ 
+ #ifdef CONFIG_FSL_DEEP_SLEEP
+diff --git a/board/freescale/ls1043ardb/ddr.h b/board/freescale/ls1043ardb/ddr.h
+index a77ddf3..6bc0eb6 100644
+--- a/board/freescale/ls1043ardb/ddr.h
++++ b/board/freescale/ls1043ardb/ddr.h
+@@ -45,4 +45,73 @@ static const struct board_specific_parameters *udimms[] = {
+ 	udimm0,
+ };
+ 
++#ifndef CONFIG_SYS_DDR_RAW_TIMING
++fsl_ddr_cfg_regs_t ddr_cfg_regs_1600 = {
++	.cs[0].bnds = 0x0000007F,
++	.cs[1].bnds = 0,
++	.cs[2].bnds = 0,
++	.cs[3].bnds = 0,
++	.cs[0].config = 0x80040322,
++	.cs[0].config_2 = 0,
++	.cs[1].config = 0,
++	.cs[1].config_2 = 0,
++	.cs[2].config = 0,
++	.cs[3].config = 0,
++	.timing_cfg_3 = 0x010C1000,
++	.timing_cfg_0 = 0x91550018,
++	.timing_cfg_1 = 0xBBB48C42,
++	.timing_cfg_2 = 0x0048C111,
++	.ddr_sdram_cfg = 0xC50C0008,
++	.ddr_sdram_cfg_2 = 0x00401100,
++	.ddr_sdram_cfg_3 = 0,
++	.ddr_sdram_mode = 0x03010210,
++	.ddr_sdram_mode_2 = 0,
++	.ddr_sdram_mode_3 = 0x00010210,
++	.ddr_sdram_mode_4 = 0,
++	.ddr_sdram_mode_5 = 0x00010210,
++	.ddr_sdram_mode_6 = 0,
++	.ddr_sdram_mode_7 = 0x00010210,
++	.ddr_sdram_mode_8 = 0,
++	.ddr_sdram_mode_9 = 0x00000500,
++	.ddr_sdram_mode_10 = 0x04000000,
++	.ddr_sdram_mode_11 = 0x00000400,
++	.ddr_sdram_mode_12 = 0x04000000,
++	.ddr_sdram_mode_13 = 0x00000400,
++	.ddr_sdram_mode_14 = 0x04000000,
++	.ddr_sdram_mode_15 = 0x00000400,
++	.ddr_sdram_mode_16 = 0x04000000,
++	.ddr_sdram_interval = 0x18600618,
++	.ddr_data_init = 0xDEADBEEF,
++	.ddr_sdram_clk_cntl = 0x03000000,
++	.ddr_init_addr = 0,
++	.ddr_init_ext_addr = 0,
++	.timing_cfg_4 = 0x00000002,
++	.timing_cfg_5 = 0x03401400,
++	.timing_cfg_6 = 0,
++	.timing_cfg_7 = 0x13300000,
++	.timing_cfg_8 = 0x02115600,
++	.timing_cfg_9 = 0,
++	.ddr_zq_cntl = 0x8A090705,
++	.ddr_wrlvl_cntl = 0x8675F607,
++	.ddr_wrlvl_cntl_2 = 0x07090800,
++	.ddr_wrlvl_cntl_3 = 0,
++	.ddr_sr_cntr = 0,
++	.ddr_sdram_rcw_1 = 0,
++	.ddr_sdram_rcw_2 = 0,
++	.ddr_cdr1 = 0x80040000,
++	.ddr_cdr2 = 0x0000A181,
++	.dq_map_0 = 0,
++	.dq_map_1 = 0,
++	.dq_map_2 = 0,
++	.dq_map_3 = 0,
++	.debug[28] = 0x00700046,
++
++};
++
++fixed_ddr_parm_t fixed_ddr_parm_0[] = {
++	{1550, 1650, &ddr_cfg_regs_1600},
++	{0, 0, NULL}
++};
++
++#endif
+ #endif
+diff --git a/include/configs/ls1043ardb.h b/include/configs/ls1043ardb.h
+index f87fce6..22ccbf1 100644
+--- a/include/configs/ls1043ardb.h
++++ b/include/configs/ls1043ardb.h
+@@ -28,13 +28,13 @@
+ 
+ #define CONFIG_SYS_SPD_BUS_NUM		0
+ 
+-#define CONFIG_FSL_DDR_BIST
+ #ifndef CONFIG_SPL
+-#define CONFIG_FSL_DDR_INTERACTIVE	/* Interactive debugging */
+-#endif
+ #define CONFIG_SYS_DDR_RAW_TIMING
++#define CONFIG_FSL_DDR_INTERACTIVE	/* Interactive debugging */
++#define CONFIG_FSL_DDR_BIST
+ #define CONFIG_ECC_INIT_VIA_DDRCONTROLLER
+ #define CONFIG_MEM_INIT_VALUE           0xdeadbeef
++#endif
+ 
+ #ifdef CONFIG_RAMBOOT_PBL
+ #define CONFIG_SYS_FSL_PBL_PBI board/freescale/ls1043ardb/ls1043ardb_pbi.cfg
+-- 
+1.9.1
+
